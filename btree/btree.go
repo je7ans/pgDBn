@@ -1,51 +1,11 @@
 // Package btree provides a B-Tree data structure
 package btree
 
-// datatype used to store keys
-type key int
-
-// A node represents a node in a Btree
-type node struct {
-	keys     []key
-	children []*node
-	deg      int  // minimum degree
-	leaf     bool // is this node a leaf
-}
-
-// newNode is a node constructor for a node of degree deg
-// leaf indicates whether the node is a leaf
-func newNode(deg int, leaf bool) *node {
-	keys := make([]key, 0, 2*d-1) // len(keys) = 0, cap(keys) = 2d-1
-	kids := make([]*node, 2*d)    // len(kids) = cap(kids) = 2d all nil
-	n := node{keys, kids, deg, leaf}
-	return &n
-}
-
-// search n for the given tree. If key is not found
-// and n is not a leaf node, search children. If key is
-// not found and n is a leaf, return nil
-func (n *node) search(k key) *node {
-	// find the index of the first key >k
-	i := 0
-	for ; i < len(n.keys) && keys[i] < k; i++ {
-	}
-
-	// key found
-	if keys[i] == k {
-		return n
-	}
-
-	// key not found, no more children to search
-	if n.leaf {
-		return nil
-	}
-
-	// search the appropriate child
-	return n.children[i].search(k)
-}
-
-// implement Stringer for node
-func (n *node) String() string {}
+import (
+	"bytes"
+	"strconv"
+	"strings"
+)
 
 // A Btree data structure
 type Btree struct {
@@ -53,16 +13,62 @@ type Btree struct {
 	deg  int   // minimum degree
 }
 
-// TODO
-func NewBtree() *Btree {}
+// Btree constructor
+func NewBtree(deg int) *Btree {
+	t := Btree{nil, deg}
+	return &t
+}
 
 // search
-func (t *Btree) search(k key) *Btree {
+func (t *Btree) search(k key) (*node, bool) {
 	if t.root == nil {
-		return nil
+		return nil, false
 	}
-	return t.root.search(key)
+	return t.root.search(k)
+}
+
+// insert
+func (t *Btree) Insert(k key) {
+	// if root is nil create node with single key
+	// and set as root
+	if t.root == nil {
+		t.root = newNode(t.deg, true)
+		t.root.keys[0] = k
+		t.root.keyc = 1
+		return
+	}
+
+	// if root is full, create new node with root as its child
+	// split root and set the new node to be root. finally insert
+	// k into the appropriate child
+	// otherwise call insertNonFull with root
+	if t.root.full() {
+		s := newNode(t.root.deg, false)
+		s.children[0] = t.root
+		s.splitChild(0, t.root)
+		var i int
+		if s.keys[0] < k {
+			i++
+		}
+		s.children[i].insertNonFull(k)
+		t.root = s
+	} else {
+		t.root.insertNonFull(k)
+	}
 }
 
 // implement Stringer for Btree
-func (n *node) String() string {}
+func (t *Btree) String() string {
+	kds := make(chan *keyDepth)
+	go t.root.traverse(0, kds)
+	var pre string
+	var buffer bytes.Buffer
+	for kd := range kds {
+		k, d := kd.k, kd.depth
+		pre = strings.Repeat("--", d)
+		buffer.WriteString(pre)
+		buffer.WriteString(strconv.Itoa(int(k)))
+		buffer.WriteString("\n")
+	}
+	return buffer.String()
+}
